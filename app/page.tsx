@@ -1,8 +1,3 @@
-// Forcing a new build on Vercel
-
-'use client'; // This is a client component
-// ... rest of the code
-
 'use client'; // This is a client component
 
 import { useState, useRef } from 'react';
@@ -52,8 +47,8 @@ const StarRating = ({ score }: { score: number }) => (
 
 
 export default function HomePage() {
-  // --- IMPORTANT: PASTE YOUR CLOUD RUN URL HERE ---
-  const BACKEND_URL = 'https://geov-backend-service-688850732364.asia-south1.run.app/'; // Replace with your real URLLL
+  // --- Backend URL ---
+  const BACKEND_URL = 'https://geov-backend-service-688850732364.asia-south1.run.app/api/analyze';
 
   // State for the map, autocomplete, and analysis
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -99,10 +94,6 @@ export default function HomePage() {
     if (!selectedPlace) {
       alert("Please select a location first.");
       return;
-    }
-    if (BACKEND_URL.includes('xxxxxxxx')) {
-        alert("Please update the BACKEND_URL in the code with your Cloud Run service URL.");
-        return;
     }
     setIsAnalyzing(true);
     setError(null);
