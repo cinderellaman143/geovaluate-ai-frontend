@@ -48,7 +48,7 @@ const StarRating = ({ score }: { score: number }) => (
 
 export default function HomePage() {
   // --- IMPORTANT: PASTE YOUR CLOUD RUN URL HERE ---
-  const BACKEND_URL = 'https://geov-backend-service-xxxxxxxx-an.a.run.app/api/analyze'; // Replace with your real URL
+  const BACKEND_URL = 'https://prompt-238254326413.us-west1.run.app/; // Replace with your real URL
 
   // State for the map, autocomplete, and analysis
   const [map, setMap] = useState<google.maps.Map | null>(null);
