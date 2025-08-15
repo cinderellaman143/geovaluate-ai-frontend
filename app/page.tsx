@@ -20,14 +20,15 @@ interface AnalysisResult {
   sources: string[];
 }
 
-// Map container style
+// --- Static variables for Google Maps ---
 const containerStyle = {
   width: '100%',
   height: '100%',
-  borderRadius: '0.75rem', // Corresponds to rounded-xl
+  borderRadius: '0.75rem',
 };
 
-// Default center (Erode, Tamil Nadu)
+const libraries: ('places')[] = ['places'];
+
 const defaultCenter = {
   lat: 11.3410,
   lng: 77.7172
@@ -63,7 +64,7 @@ export default function HomePage() {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['places'],
+    libraries, // Use the static libraries variable
   });
 
   // Handlers for autocomplete
@@ -81,7 +82,7 @@ export default function HomePage() {
         };
         setCenter(newCenter);
         setSelectedPlace(place.formatted_address || '');
-        setAnalysisResult(null); // Clear previous results
+        setAnalysisResult(null);
         setError(null);
         map?.panTo(newCenter);
         map?.setZoom(15);
@@ -242,7 +243,7 @@ export default function HomePage() {
               onLoad={setMap}
               options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
             >
-               <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -100%)' }}>
+               <div style={{ position: 'absolute', left: 'public' }}>
                  <MapPin className="text-red-500 w-10 h-10 animate-bounce" />
               </div>
             </GoogleMap>
