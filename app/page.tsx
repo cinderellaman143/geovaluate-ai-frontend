@@ -147,7 +147,7 @@ export default function HomePage() {
       <main className="flex-grow container mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left Column: Input & Analysis */}
-        <div className="lg:col-span-1 flex flex-col space-y-6">
+        <div className="lg-col-span-1 flex flex-col space-y-6">
           <div className="bg-white p-6 rounded-xl shadow-md">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Analyze a Property</h2>
             {isLoaded && (
@@ -243,7 +243,7 @@ export default function HomePage() {
               onLoad={setMap}
               options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
             >
-               <div style={{ position: 'absolute', left: 'public' }}>
+               <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -100%)' }}>
                  <MapPin className="text-red-500 w-10 h-10 animate-bounce" />
               </div>
             </GoogleMap>
