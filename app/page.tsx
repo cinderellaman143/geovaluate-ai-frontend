@@ -57,7 +57,7 @@ export default function HomePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   // Load the Google Maps script
   const { isLoaded, loadError } = useJsApiLoader({
