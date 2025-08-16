@@ -1,23 +1,15 @@
 'use client'; // This is a client component
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Autocomplete } from '@react-google-maps/api';
-import { MapPin, Search, Bot, Loader2, Star, ExternalLink } from 'lucide-react';
+import { MapPin, Search, Bot, Loader2, ExternalLink } from 'lucide-react';
 
 // --- Type Definitions for API Response ---
-interface HedonicFactor {
-  factor: string;
-  score: number;
-  justification: string;
-}
-
-interface AnalysisResult {
-  address: string;
-  fair_value_estimate: string;
-  hedonic_analysis: HedonicFactor[];
-  growth_trends: string;
-  projected_appreciation: string;
-  sources: string[];
+interface ReraListing {
+  project_name: string;
+  developer: string;
+  details: string;
+  source_url: string;
 }
 
 // --- Static variables for Google Maps ---
@@ -34,32 +26,17 @@ const defaultCenter = {
   lng: 77.7172
 };
 
-// --- Helper Component for Star Ratings ---
-const StarRating = ({ score }: { score: number }) => (
-  <div className="flex items-center">
-    {[...Array(5)].map((_, i) => (
-      <Star
-        key={i}
-        className={`w-5 h-5 ${i < score ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-      />
-    ))}
-  </div>
-);
-
-
 export default function HomePage() {
   // --- Backend URL ---
-  const BACKEND_URL_START = 'https://geov-backend-service-688850732364.asia-south1.run.app/api/start-analysis';
-  const BACKEND_URL_STATUS = 'https://geov-backend-service-688850732364.asia-south1.run.app/api/status/';
+  const BACKEND_URL = 'https://geov-backend-service-688850732364.asia-south1.run.app/api/find-rera-listings';
 
   // State
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [center, setCenter] = useState(defaultCenter);
   const [selectedPlace, setSelectedPlace] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [listings, setListings] = useState<ReraListing[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [jobId, setJobId] = useState<string | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   // Load the Google Maps script
@@ -68,39 +45,6 @@ export default function HomePage() {
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
     libraries,
   });
-  
-  // Polling effect
-  useEffect(() => {
-    if (jobId && isAnalyzing) {
-      const interval = setInterval(async () => {
-        try {
-          const response = await fetch(BACKEND_URL_STATUS + jobId);
-          const data = await response.json();
-
-          if (data.status === 'completed') {
-            setAnalysisResult(data.result);
-            setIsAnalyzing(false);
-            setJobId(null);
-            clearInterval(interval);
-          } else if (data.status === 'failed') {
-            setError('The AI analysis failed. Please try again.');
-            setIsAnalyzing(false);
-            setJobId(null);
-            clearInterval(interval);
-          }
-          // If status is 'pending', do nothing and wait for the next poll.
-        } catch (err) {
-          setError('Failed to get analysis status.');
-          setIsAnalyzing(false);
-          setJobId(null);
-          clearInterval(interval);
-        }
-      }, 5000); // Poll every 5 seconds
-
-      return () => clearInterval(interval); // Cleanup on component unmount
-    }
-  }, [jobId, isAnalyzing]);
-
 
   // Handlers
   const onLoad = (autocomplete: google.maps.places.Autocomplete) => {
@@ -114,7 +58,7 @@ export default function HomePage() {
         const newCenter = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
         setCenter(newCenter);
         setSelectedPlace(place.formatted_address || '');
-        setAnalysisResult(null);
+        setListings([]);
         setError(null);
         map?.panTo(newCenter);
         map?.setZoom(15);
@@ -129,23 +73,26 @@ export default function HomePage() {
     }
     setIsAnalyzing(true);
     setError(null);
-    setAnalysisResult(null);
-    setJobId(null);
+    setListings([]);
 
     try {
-      const response = await fetch(BACKEND_URL_START, {
+      const response = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: selectedPlace, lat: center.lat, lng: center.lng }),
+        body: JSON.stringify({ address: selectedPlace }),
       });
 
-      if (!response.ok) throw new Error('Failed to start analysis job.');
+      if (!response.ok) {
+        throw new Error('Network response was not ok. The backend might have an error.');
+      }
 
       const data = await response.json();
-      setJobId(data.job_id);
+      setListings(data.listings);
 
     } catch (err) {
-      setError('Failed to start analysis. Please check your backend and try again.');
+      setError('Failed to fetch listings. Please check the backend and try again.');
+      console.error(err);
+    } finally {
       setIsAnalyzing(false);
     }
   };
@@ -165,7 +112,7 @@ export default function HomePage() {
       <main className="flex-grow container mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 flex flex-col space-y-6">
           <div className="bg-white p-6 rounded-xl shadow-md">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Analyze a Property</h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Search for RERA Listings</h2>
             {isLoaded && (
               <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
                 <div className="relative">
@@ -174,72 +121,44 @@ export default function HomePage() {
                 </div>
               </Autocomplete>
             )}
-            {!isLoaded && <p className="text-sm text-gray-500">Loading map tools...</p>}
-            {loadError && <p className="text-sm text-red-500">Error loading Google Maps. Please check your API key.</p>}
             <button onClick={handleAnalyze} disabled={isAnalyzing || !selectedPlace || !isLoaded} className="mt-4 w-full flex items-center justify-center px-4 py-3 text-base font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed">
               {isAnalyzing ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Search className="w-5 h-5 mr-2" />}
-              {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+              {isAnalyzing ? 'Searching...' : 'Search'}
             </button>
           </div>
           
           <div className="bg-white p-6 rounded-xl shadow-md flex-grow">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">AI Analysis Report</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">RERA Approved Listings</h3>
             {isAnalyzing && (
               <div className="text-center text-gray-500">
                 <Loader2 className="w-8 h-8 mx-auto animate-spin text-blue-500" />
-                <p className="mt-2">Generating report from live AI... This may take a moment.</p>
+                <p className="mt-2">Searching for listings...</p>
               </div>
             )}
             {error && <div className="text-red-500 text-center">{error}</div>}
-            {analysisResult && (
-              <div className="space-y-4 text-sm">
-                 <div>
-                  <h4 className="font-semibold text-gray-600">Fair Value Estimate</h4>
-                  <p className="text-blue-600 font-bold text-lg">{analysisResult.fair_value_estimate}</p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-600 mb-2">Hedonic Analysis</h4>
-                  <div className="space-y-3">
-                    {analysisResult.hedonic_analysis.map(item => (
-                      <div key={item.factor}>
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium text-gray-700">{item.factor}</span>
-                          <StarRating score={item.score} />
-                        </div>
-                        <p className="text-gray-500 text-xs mt-1">{item.justification}</p>
-                      </div>
-                    ))}
+            
+            {!isAnalyzing && !error && listings.length > 0 && (
+              <div className="space-y-4">
+                {listings.map((listing, index) => (
+                  <div key={index} className="border-b pb-3 last:border-b-0">
+                    <h4 className="font-bold text-gray-800">{listing.project_name}</h4>
+                    <p className="text-sm text-gray-600">by {listing.developer}</p>
+                    <p className="text-sm text-gray-500 mt-1">{listing.details}</p>
+                    <a href={listing.source_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs flex items-center mt-1">
+                      View Source <ExternalLink className="w-3 h-3 ml-1" />
+                    </a>
                   </div>
-                </div>
-                 <div>
-                  <h4 className="font-semibold text-gray-600">Growth Trends</h4>
-                  <p className="text-gray-500">{analysisResult.growth_trends}</p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-600">Projected Appreciation</h4>
-                  <p className="text-gray-500">{analysisResult.projected_appreciation}</p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-600">Sources</h4>
-                  <ul className="list-none space-y-1 mt-1">
-                    {analysisResult.sources.map(source => (
-                      <li key={source}>
-                        <a href={source} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs flex items-center break-all">
-                          {source} <ExternalLink className="w-3 h-3 ml-1 flex-shrink-0" />
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                ))}
               </div>
             )}
-            {!isAnalyzing && !error && !analysisResult && <p className="text-center text-gray-500">Your report will appear here.</p>}
+
+            {!isAnalyzing && !error && listings.length === 0 && (
+              <p className="text-center text-gray-500">No listings found, or your search results will appear here.</p>
+            )}
           </div>
         </div>
 
         <div className="lg:col-span-2 bg-gray-200 rounded-xl shadow-md min-h-[400px] lg:min-h-0 flex items-center justify-center">
-          {loadError && <div className="text-red-500">Error loading map. Please check your API key.</div>}
-          {!isLoaded && !loadError && <div className="text-gray-500">Loading Map...</div>}
           {isLoaded && (
             <GoogleMap mapContainerStyle={containerStyle} center={center} zoom={12} onLoad={setMap} options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}>
                <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -100%)' }}>
