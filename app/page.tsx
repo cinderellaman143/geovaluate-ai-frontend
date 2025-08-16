@@ -4,6 +4,7 @@ import os
 import json
 import logging
 import time
+import asyncio
 from functools import wraps
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,7 +40,7 @@ class ReraResponse(BaseModel):
 # --- FastAPI Application Setup ---
 app = FastAPI(
     title="GeoValuate AI API (Simple RERA Search)",
-    version="1.0.3", # Version update for timing logs
+    version="1.0.4", # Version update for improved async handling
 )
 
 # --- Timing Middleware ---
@@ -88,29 +89,35 @@ Your final output MUST be a single, valid JSON object that strictly conforms to 
 @timed # Apply the timing decorator to this specific function
 async def find_rera_listings(request: AnalysisRequest):
     logger.info(f"Received RERA search request for: {request.address}")
-
+    
     try:
-        # Initialize Gemini client inside the request function for serverless environments
         if "GEMINI_API_KEY" not in os.environ:
             raise RuntimeError("GEMINI_API_KEY environment variable not set.")
         genai.configure(api_key=os.environ["GEMINI_API_KEY"])
         model = genai.GenerativeModel('gemini-1.5-flash')
 
-        schema_json = ReraResponse.schema_json(indent=2)
+        try:
+            schema_json = ReraResponse.schema_json(indent=2)  # Pydantic v1
+        except AttributeError:
+            schema_json = json.dumps(ReraResponse.model_json_schema(), indent=2)  # Pydantic v2
+
         prompt = RERA_PROMPT.format(address=request.address, schema=schema_json)
 
-        response = model.generate_content(prompt)
-        
+        # Run the synchronous SDK call in a separate thread to avoid blocking the event loop
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, model.generate_content, prompt)
+
         cleaned_response_text = response.text.strip().replace("```json", "").replace("```", "").strip()
         response_data = json.loads(cleaned_response_text)
         validated_response = ReraResponse(**response_data)
-        
-        logger.info(f"Successfully found {len(validated_response.listings)} listings for {request.address}")
+
+        logger.info(f"✅ Found {len(validated_response.listings)} listings for {request.address}")
         return validated_response
 
     except Exception as e:
-        logger.error(f"An error occurred during RERA search: {e}")
+        logger.error(f"❌ Error in RERA search: {e}")
         raise HTTPException(status_code=500, detail="An error occurred while communicating with the AI model.")
+
 
 @app.get("/")
 def read_root():
